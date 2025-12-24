@@ -18,22 +18,17 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 # --------------- setup --------------- #
-# make sure stopwords exist (first run only downloads once)
 nltk.download("stopwords", quiet=True)
 from nltk.corpus import stopwords
 
 STOP_WORDS = set(stopwords.words("english"))
-
-
 # --------------- text cleaning --------------- #
 def clean_text(text: str) -> str:
     """Lowercase, remove punctuation/digits, strip stopwords."""
     text = str(text).lower()
-    text = re.sub(r"[^a-z\s]", " ", text)  # keep letters + spaces
+    text = re.sub(r"[^a-z\s]", " ", text) 
     words = [w for w in text.split() if w not in STOP_WORDS]
     return " ".join(words)
-
-
 # --------------- data loader --------------- #
 def load_dataset():
     """
@@ -45,15 +40,11 @@ def load_dataset():
     csv_path = "news.csv"
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
-        # minimal sanity checks
         if not {"text", "label"}.issubset(df.columns):
             raise ValueError("CSV must have columns: 'text' and 'label' (0=Real, 1=Fake).")
-        # drop rows with missing values
         df = df[["text", "label"]].dropna()
-        # ensure labels are 0/1 ints
         df["label"] = df["label"].astype(int)
         return df.reset_index(drop=True)
-
     # Fallback demo dataset (balanced, just for pipeline correctness)
     data = {
         "text": [
@@ -73,14 +64,11 @@ def load_dataset():
     }
     return pd.DataFrame(data)
 
-
 # --------------- training & evaluation --------------- #
 def train_and_evaluate(df: pd.DataFrame):
-    # clean text
     df = df.copy()
     df["clean_text"] = df["text"].apply(clean_text)
 
-    # ensure we have both classes present
     classes = df["label"].unique()
     if len(classes) < 2:
         raise ValueError(
@@ -88,7 +76,6 @@ def train_and_evaluate(df: pd.DataFrame):
             "Check your CSV labels."
         )
 
-    # split (stratify to ensure both classes appear in train/test)
     X_train, X_test, y_train, y_test = train_test_split(
         df["clean_text"],
         df["label"],
@@ -97,16 +84,13 @@ def train_and_evaluate(df: pd.DataFrame):
         stratify=df["label"],
     )
 
-    # TF-IDF (plain as per requirement; bigrams optional but kept off to stay strict)
     vectorizer = TfidfVectorizer()
     X_train_tfidf = vectorizer.fit_transform(X_train)
     X_test_tfidf = vectorizer.transform(X_test)
 
-    # Logistic Regression (increase max_iter for convergence safety)
     model = LogisticRegression(max_iter=1000)
     model.fit(X_train_tfidf, y_train)
 
-    # predictions & metrics
     y_pred = model.predict(X_test_tfidf)
     acc = accuracy_score(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
@@ -121,8 +105,6 @@ def train_and_evaluate(df: pd.DataFrame):
 
     return model, vectorizer
 
-
-# --------------- quick demo predictions --------------- #
 def demo_predictions(model, vectorizer):
     samples = [
         "Government announces scholarship program for STEM students",
@@ -145,8 +127,3 @@ if __name__ == "__main__":
     model, vectorizer = train_and_evaluate(df)
     demo_predictions(model, vectorizer)
 
-    # If you want to test your own text, uncomment:
-    # user_text = input("\nEnter a news headline/text to classify: ")
-    # cleaned = clean_text(user_text)
-    # pred = model.predict(vectorizer.transform([cleaned]))[0]
-    # print("Prediction:", "FAKE" if pred == 1 else "REAL")
